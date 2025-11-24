@@ -1,0 +1,84 @@
+services:
+  mariadb:
+    image: mariadb:10.11
+    container_name: daloradius-mariadb
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: ${DB_SCHEMA:-radius}
+      MYSQL_USER: ${DB_USER:-radius}
+      MYSQL_PASSWORD: ${DB_PASS:-radiuspass}
+    volumes:
+      - mariadb_data:/var/lib/mysql
+      - ./init-db:/docker-entrypoint-initdb.d
+    networks:
+      - daloradius-network
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  freeradius:
+    build:
+      context: .
+      dockerfile: Dockerfile.freeradius
+    container_name: daloradius-freeradius
+    restart: unless-stopped
+    environment:
+      DB_HOST: mariadb
+      DB_PORT: ${DB_PORT:-3306}
+      DB_USER: ${DB_USER:-radius}
+      DB_PASS: ${DB_PASS:-radiuspass}
+      DB_SCHEMA: ${DB_SCHEMA:-radius}
+    ports:
+      - "1812:1812/udp"  # RADIUS authentication
+      - "1813:1813/udp"  # RADIUS accounting
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    networks:
+      - daloradius-network
+    volumes:
+      - freeradius_logs:/var/log/freeradius
+
+  daloradius:
+    build:
+      context: .
+      dockerfile: Dockerfile.daloradius
+    container_name: daloradius-web
+    restart: unless-stopped
+    environment:
+      DB_HOST: mariadb
+      DB_PORT: ${DB_PORT:-3306}
+      DB_USER: ${DB_USER:-radius}
+      DB_PASS: ${DB_PASS:-radiuspass}
+      DB_SCHEMA: ${DB_SCHEMA:-radius}
+      DALORADIUS_USERS_PORT: ${DALORADIUS_USERS_PORT:-80}
+      DALORADIUS_OPERATORS_PORT: ${DALORADIUS_OPERATORS_PORT:-8000}
+      DALORADIUS_SERVER_ADMIN: ${DALORADIUS_SERVER_ADMIN:-admin@daloradius.local}
+    ports:
+      - "${DALORADIUS_USERS_PORT:-80}:80"           # Users interface
+      - "${DALORADIUS_OPERATORS_PORT:-8000}:8000"   # Operators interface
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    networks:
+      - daloradius-network
+    volumes:
+      - daloradius_logs:/var/log/apache2/daloradius
+      - daloradius_var:/var/www/daloradius/var
+
+volumes:
+  mariadb_data:
+    driver: local
+  freeradius_logs:
+    driver: local
+  daloradius_logs:
+    driver: local
+  daloradius_var:
+    driver: local
+
+networks:
+  daloradius-network:
+    driver: bridge
