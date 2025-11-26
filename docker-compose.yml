@@ -1,4 +1,3 @@
-version: "3"
 
 services:
 
@@ -32,10 +31,12 @@ services:
       - MYSQL_USER=radius
       - MYSQL_PASSWORD=radiusdbpw
       # Optional settings
-      - DEFAULT_CLIENT_SECRET=testing123
+      - DEFAULT_CLIENT_SECRET=seamolec
     volumes:
       - ./data/freeradius:/data
       - radius_logs:/var/log/freeradius
+      - /etc/freeradius/3.0/clients.conf:/etc/freeradius/clients.conf
+      - /etc/freeradius/3.0/sites-enabled/inner-tunnel:/etc/freeradius/sites-enabled/inner-tunnel
     # Uncomment below to enable debug logging.
     #command: -X
 
@@ -56,7 +57,7 @@ services:
       - MYSQL_USER=radius
       - MYSQL_PASSWORD=radiusdbpw
       # Optional Settings:
-      - DEFAULT_CLIENT_SECRET=testing123
+      - DEFAULT_CLIENT_SECRET=seamolec
       - DEFAULT_FREERADIUS_SERVER=radius
       - MAIL_SMTPADDR=127.0.0.1
       - MAIL_PORT=25
