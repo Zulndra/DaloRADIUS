@@ -1,0 +1,40 @@
+
+services:
+  mariadb:
+    image: mariadb:10.6
+    container_name: radius-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: radius
+      MYSQL_USER: radiususer
+      MYSQL_PASSWORD: radiuspass
+    volumes:
+      - ./db:/var/lib/mysql
+      - ./freeradius/mods-config/sql/main/mysql/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./mysql-init.sql:/docker-entrypoint-initdb.d/02-init.sql:ro
+    ports:
+      - "3306:3306"
+    networks:
+      - radius_net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 5s
+      retries: 10
+
+  freeradius:
+    build: .
+    container_name: freeradius
+    restart: unless-stopped
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    ports:
+      - "1812:1812/udp"
+      - "1813:1813/udp"
+    networks:
+      - radius_net
+
+networks:
+  radius_net:
+    driver: bridge
